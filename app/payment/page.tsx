@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Script from 'next/script';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
@@ -11,7 +11,7 @@ declare global {
   }
 }
 
-export default function PaymentPage() {
+function PaymentInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const bookingId = searchParams.get('bookingId');
@@ -43,7 +43,6 @@ export default function PaymentPage() {
     }
 
     try {
-      // Step 1: Create Razorpay Order via backend API
       const res = await fetch('/api/razorpay/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,7 +60,6 @@ export default function PaymentPage() {
 
       const { order } = data;
 
-      // Step 2: Configure Razorpay checkout
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: order.amount,
@@ -69,25 +67,13 @@ export default function PaymentPage() {
         name: "Cricketing Veins",
         description: booking.serviceName,
         order_id: order.id,
-
         prefill: {
           name: booking.userName,
           email: booking.userEmail || "test@example.com",
           contact: booking.userPhone || "9999999999",
         },
-
-        // Show UPI, Cards, Netbanking, Wallets
-        method: {
-          upi: true,
-          card: true,
-          netbanking: true,
-          wallet: true,
-        },
-
-        theme: {
-          color: "#22c55e",
-        },
-
+        method: { upi: true, card: true, netbanking: true, wallet: true },
+        theme: { color: "#22c55e" },
         handler: async function (response: any) {
           const verifyRes = await fetch('/api/razorpay/verify', {
             method: 'POST',
@@ -115,7 +101,6 @@ export default function PaymentPage() {
         },
       };
 
-      // Step 4: Open Razorpay popup
       const razorpay = new window.Razorpay(options);
       razorpay.open();
       setPaymentStarted(true);
@@ -137,11 +122,8 @@ export default function PaymentPage() {
     )}`;
 
     console.log("Opening UPI link:", upiLink);
-
-    // This must be triggered by user interaction (button click)
     window.location.href = upiLink;
   };
-
 
   if (!booking) {
     return (
@@ -171,11 +153,8 @@ export default function PaymentPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-50 to-white pt-16">
-      {/* Razorpay Checkout Script */}
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
-
       <div className="max-w-3xl mx-auto p-6">
-        {/* Back Button */}
         <button
           onClick={() => router.push('/booking')}
           className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
@@ -186,29 +165,17 @@ export default function PaymentPage() {
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
           <h1 className="text-3xl font-bold mb-6 text-gray-800">Complete Payment</h1>
 
-          {/* Booking Summary */}
           <div className="mb-6">
             <h2 className="text-xl font-semibold mb-3">Booking Summary</h2>
             <div className="space-y-2 text-gray-700">
-              <p>
-                <span className="font-medium">Name:</span> {booking.userName}
-              </p>
-              <p>
-                <span className="font-medium">Service:</span> {booking.serviceName}
-              </p>
-              <p>
-                <span className="font-medium">Date:</span> {booking.date}
-              </p>
-              <p>
-                <span className="font-medium">Time Slot:</span> {booking.timeSlot}
-              </p>
-              <p>
-                <span className="font-medium">Total Amount:</span> ₹{booking.totalAmount}
-              </p>
+              <p><span className="font-medium">Name:</span> {booking.userName}</p>
+              <p><span className="font-medium">Service:</span> {booking.serviceName}</p>
+              <p><span className="font-medium">Date:</span> {booking.date}</p>
+              <p><span className="font-medium">Time Slot:</span> {booking.timeSlot}</p>
+              <p><span className="font-medium">Total Amount:</span> ₹{booking.totalAmount}</p>
             </div>
           </div>
 
-          {/* Amount Input */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Enter Payment Amount
@@ -222,9 +189,7 @@ export default function PaymentPage() {
             />
           </div>
 
-          {/* Razorpay Button */}
           <div className="space-y-6">
-            {/* Razorpay Payment Button */}
             <button
               onClick={handlePayNow}
               className="w-full bg-green-600 text-white py-4 rounded-lg font-semibold text-lg hover:bg-green-700 transition-all"
@@ -232,14 +197,12 @@ export default function PaymentPage() {
               Pay with Razorpay
             </button>
 
-            {/* OR Divider */}
             <div className="flex items-center">
               <div className="flex-grow h-px bg-gray-200"></div>
               <span className="px-4 text-gray-500 text-sm">OR</span>
               <div className="flex-grow h-px bg-gray-200"></div>
             </div>
 
-            {/* Direct UPI Payment Button */}
             <button
               onClick={handleOpenUpiApp}
               className="w-full bg-orange-500 text-white py-4 rounded-lg font-semibold text-lg hover:bg-orange-600 transition-all"
@@ -248,12 +211,19 @@ export default function PaymentPage() {
             </button>
           </div>
 
-          {/* Note */}
           <p className="mt-4 text-center text-gray-500 text-sm">
             If you pay using a direct UPI app, please return here and click Razorpay's "I Have Paid" to confirm your booking.
           </p>
         </div>
       </div>
     </main>
+  );
+}
+
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading payment...</div>}>
+      <PaymentInner />
+    </Suspense>
   );
 }
